@@ -14,33 +14,35 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+  
     try {
-      const response = await axios.post('http://localhost:3000/api/login', 
-        { email, password }, 
-        { withCredentials: true }
+      const response = await axios.post('http://localhost:3001/api/login', 
+        { email, password },
+        { withCredentials: true } // Include credentials
       );
-      const token = response.data.token;
-      const role = response.data.role;
-
-      if (!role || !token) {
-        setError('Login failed: Role or token missing');
-        setPopupMessage('Login failed: Role or token missing');
+  
+      console.log('Login response:', response.data);
+  
+      if (response.status === 200) {
+        const { token, role } = response.data;
+  
+        localStorage.setItem('token', token);
+        login(role, token);
+  
+        setPopupMessage('Login successful!');
         setShowPopup(true);
-        return;
-      }
-
-      localStorage.setItem('token', token);
-      login(role, token);
-
-      setPopupMessage('Login successful!');
-      setShowPopup(true);
-
-      if (role === 'admin') {
-        navigate('/admin-dashboard');
-      } else if (role === 'user') {
-        navigate('/user-dashboard');
+  
+        if (role === 'admin') {
+          navigate('/admin-dashboard');
+        } else if (role === 'user') {
+          navigate('/user-dashboard');
+        } else {
+          navigate('/');
+        }
       } else {
-        navigate('/');
+        setError('Login failed: ' + response.data.message);
+        setPopupMessage('Login failed: ' + response.data.message);
+        setShowPopup(true);
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Invalid email or password';
@@ -49,12 +51,10 @@ const Login = () => {
       setShowPopup(true);
     }
   };
-
-  // Define the closePopup function
   const closePopup = () => {
     setShowPopup(false);
   };
-
+  
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-indigo-300 to-blue-700">
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">

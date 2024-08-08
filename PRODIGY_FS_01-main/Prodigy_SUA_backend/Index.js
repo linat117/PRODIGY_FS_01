@@ -1,34 +1,28 @@
-const cors = require('cors');
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
+const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const User = require('./models/User');
 const authRoutes = require('./authRoutes');
 const authorize = require('./middlewares/roleMiddleware');
-const bcrypt = require('bcrypt');
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const JWT_SECRET = 'Prodigy12345';
-const users = {
-  'admin@example.com': { role: 'admin', passwordHash: bcrypt.hashSync('adminpass', 10) },
-  'user@example.com': { role: 'user', passwordHash: bcrypt.hashSync('userpass', 10) }
-};
-// Middleware
-app.use(bodyParser.json());
 
 // CORS configuration
-app.use(cors({
-  origin: 'http://localhost:5174/', // Replace with your frontend's URL
-  credentials: true // If you are sending cookies or authorization headers
-}));
-app.options('*', cors({
-  origin: 'http://localhost:5174',
-  credentials: true
-}));
+const corsOptions = {
+  origin: 'http://localhost:5176', // Your frontend URL
+  credentials: true // Allow credentials to be included
+};
 
+app.use(cors(corsOptions));
+app.use(bodyParser.json());
 app.use('/api', authRoutes);
-//app.options('*', cors());
+const generateToken = (user) => {
+  return jwt.sign({ email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+};
 
 // JWT Authentication Middleware
 const authenticate = (req, res, next) => {
@@ -40,6 +34,23 @@ const authenticate = (req, res, next) => {
     next();
   });
 };
+const authenticateUser = async (email, password) => {
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return null;
+
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (isMatch) {
+      return user; // Return user if credentials match
+    } else {
+      return null; // Return null if credentials don't match
+    }
+  } catch (error) {
+    console.error('Error authenticating user:', error);
+    return null;
+  }
+};
+
 
 // MongoDB Connection
 mongoose.connect('mongodb://localhost:27017/Prodigy_Secure_user_authentication');
@@ -51,8 +62,8 @@ db.once('open', () => {
 
 // Register endpoint
 app.post('/api/register', async (req, res) => {
- 
   const { username, email, password, confirmPassword, role } = req.body;
+
   if (users[email]) {
     return res.status(400).json({ error: 'User already exists' });
   }
@@ -60,7 +71,6 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
-  // Check if password and confirmPassword match
   if (password !== confirmPassword) {
     return res.status(400).json({ error: 'Passwords do not match' });
   }
@@ -72,7 +82,6 @@ app.post('/api/register', async (req, res) => {
 });
 
 // Login endpoint
-// Example of a login endpoint
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -89,6 +98,10 @@ app.post('/api/login', async (req, res) => {
     res.status(401).json({ message: 'Invalid email or password' });
   }
 });
+
+
+
+
 
 
 // Admin-only Route
